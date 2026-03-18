@@ -98,11 +98,21 @@ def compute_cycle_and_lead_time(history_df: pd.DataFrame, items_df: pd.DataFrame
     if history_df.empty or items_df.empty:
         return items_df.copy()
 
+    # Detecta o estado de início do Cycle Time:
+    # 1) Tenta match exato com CYCLE_TIME_START_STATUS
+    # 2) Fallback: qualquer estado que contenha "in progress" (case-insensitive)
+    all_states = history_df["to_state"].dropna().unique()
+    exact = config.CYCLE_TIME_START_STATUS
+    if exact in all_states:
+        cycle_start_states = {exact}
+    else:
+        cycle_start_states = {s for s in all_states if "in progress" in s.lower() or "em andamento" in s.lower()}
+
     cycle_start_map = {}
 
     for item_id, group in history_df.groupby("item_id"):
         group = group.sort_values("changed_date")
-        in_progress = group[group["to_state"] == config.CYCLE_TIME_START_STATUS]
+        in_progress = group[group["to_state"].isin(cycle_start_states)]
         if not in_progress.empty:
             cycle_start_map[item_id] = in_progress.iloc[0]["changed_date"]
 

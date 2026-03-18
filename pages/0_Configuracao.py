@@ -102,6 +102,23 @@ if config.AZURE_ORG and config.AZURE_PROJECT and config.AZURE_PAT:
                 st.info(f"**Nos dados, não no config ({len(extra_real)}):**")
                 for s in extra_real:
                     st.write(f"  ℹ️ {s}")
+        # Detecta estado de início do Cycle Time
+        st.markdown("**Estado de início do Cycle Time detectado:**")
+        history_df = st.session_state.get("history_df")
+        if history_df is not None and not history_df.empty:
+            all_hist_states = history_df["to_state"].dropna().unique().tolist()
+            exact = config.CYCLE_TIME_START_STATUS
+            if exact in all_hist_states:
+                st.success(f"✅ Match exato: `{exact}`")
+            else:
+                fallback = [s for s in all_hist_states if "in progress" in s.lower() or "em andamento" in s.lower()]
+                if fallback:
+                    st.warning(f"⚠️ `{exact}` não encontrado. Usando fallback: `{', '.join(fallback)}`")
+                    st.info(f"Para corrigir, altere `CYCLE_TIME_START_STATUS` em `config.py` para um desses valores.")
+                else:
+                    st.error(f"❌ Nenhum estado 'In Progress' encontrado. Estados disponíveis: {', '.join(sorted(all_hist_states))}")
+        else:
+            st.info("Carregue dados com histórico para verificar.")
     else:
         st.info("Carregue os dados na página principal para verificar os estados.")
 
