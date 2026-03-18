@@ -107,16 +107,21 @@ def compute_cycle_and_lead_time(history_df: pd.DataFrame, items_df: pd.DataFrame
             cycle_start_map[item_id] = in_progress.iloc[0]["changed_date"]
 
     df = items_df.copy()
-    df["cycle_start"] = df["id"].map(cycle_start_map)
+    # map() retorna NaN (float) para IDs não encontrados — converte para NaT
+    df["cycle_start"] = pd.to_datetime(df["id"].map(cycle_start_map), utc=True, errors="coerce")
 
     # Lead Time (dias corridos)
-    df["lead_time"] = (df["closed_date"] - df["created_date"]).dt.total_seconds() / 86400
-    df["lead_time"] = df["lead_time"].where(df["closed_date"].notna())
+    lead_delta = df["closed_date"] - df["created_date"]
+    df["lead_time"] = lead_delta.dt.total_seconds().div(86400).where(df["closed_date"].notna())
 
     # Cycle Time (dias corridos)
-    df["cycle_time"] = (df["closed_date"] - df["cycle_start"]).dt.total_seconds() / 86400
-    df["cycle_time"] = df["cycle_time"].where(df["closed_date"].notna() & df["cycle_start"].notna())
-    df["cycle_time"] = df["cycle_time"].clip(lower=0)
+    cycle_delta = df["closed_date"] - df["cycle_start"]
+    df["cycle_time"] = (
+        cycle_delta.dt.total_seconds()
+        .div(86400)
+        .where(df["closed_date"].notna() & df["cycle_start"].notna())
+        .clip(lower=0)
+    )
 
     return df
 
