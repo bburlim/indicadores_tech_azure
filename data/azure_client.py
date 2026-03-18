@@ -69,7 +69,6 @@ def discover_custom_fields() -> dict:
     }
 
     result = {}
-    custom_fields = [f for f in fields if f.get("referenceName", "").startswith(("Custom.", "System.") is False or True)]
     custom_fields = [f for f in fields if not f.get("referenceName", "").startswith("System.")
                      and not f.get("referenceName", "").startswith("Microsoft.")]
 
