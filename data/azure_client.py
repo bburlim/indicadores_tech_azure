@@ -221,8 +221,8 @@ def _fetch_item_details(ids: list, field_map: dict) -> pd.DataFrame:
     if df.empty:
         return df
 
-    df["created_date"] = pd.to_datetime(df["created_date"], utc=True)
-    df["closed_date"] = pd.to_datetime(df["closed_date"], utc=True)
+    df["created_date"] = pd.to_datetime(df["created_date"], format="ISO8601", utc=True)
+    df["closed_date"] = pd.to_datetime(df["closed_date"], format="ISO8601", utc=True)
     df["item_type_general"] = df["type"].apply(_classify_type_general)
 
     return df
@@ -278,7 +278,7 @@ def fetch_state_history(item_ids: tuple) -> pd.DataFrame:
         return pd.DataFrame(columns=["item_id", "from_state", "to_state", "changed_date"])
 
     df = pd.DataFrame(rows)
-    df["changed_date"] = pd.to_datetime(df["changed_date"], utc=True)
+    df["changed_date"] = pd.to_datetime(df["changed_date"], format="ISO8601", utc=True)
     df = df.sort_values(["item_id", "changed_date"]).reset_index(drop=True)
     return df
 
