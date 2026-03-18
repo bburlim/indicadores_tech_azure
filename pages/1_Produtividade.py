@@ -151,7 +151,7 @@ with col2:
     if not vq.empty:
         delivered = df[df["closed_date"].notna()].copy()
         delivered["week_ordinal"] = delivered["closed_date"].apply(
-            lambda x: (x.year - 2020) * 52 + x.isocalendar()[1] if not hasattr(x, 'isocalendar') or x != x else None
+            lambda x: (x.year - 2020) * 52 + x.isocalendar()[1] if pd.notna(x) else None
         )
         week_agg = delivered.groupby("week_ordinal")["vazao_qualificada"].sum().reset_index()
         fig_scatter = scatter_trend(week_agg, "week_ordinal", "vazao_qualificada",
