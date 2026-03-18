@@ -18,7 +18,7 @@ def _get_secret(key: str, default: str = "") -> str:
 
 # Azure DevOps
 AZURE_ORG = _get_secret("AZURE_DEVOPS_ORG", "emiteai")
-AZURE_PROJECT = _get_secret("AZURE_DEVOPS_PROJECT", "")
+AZURE_PROJECT = _get_secret("AZURE_DEVOPS_PROJECT", "EmiteAi")
 AZURE_PAT = _get_secret("AZURE_DEVOPS_PAT", "")
 
 AZURE_BASE_URL = f"https://dev.azure.com/{AZURE_ORG}/{AZURE_PROJECT}/_apis"

@@ -103,7 +103,8 @@ def time_in_status_by_month(items_df: pd.DataFrame, time_by_status_df: pd.DataFr
         time_by_status_df, left_on="id", right_on="item_id", how="inner"
     )
     delivered = merged[merged["closed_date"].notna()].copy()
-    delivered["month"] = delivered["closed_date"].dt.to_period("M")
+    closed_naive = delivered["closed_date"].dt.tz_convert(None) if delivered["closed_date"].dt.tz is not None else delivered["closed_date"]
+    delivered["month"] = closed_naive.dt.to_period("M")
 
     cols = [c for c in time_by_status_df.columns if c not in ("item_id", "closed_date", "month")]
     cols = [c for c in cols if c in delivered.columns]

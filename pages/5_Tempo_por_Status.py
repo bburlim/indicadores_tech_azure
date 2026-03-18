@@ -61,8 +61,21 @@ st.subheader("Tempo por Status - Geral (% mensal)")
 
 monthly_pct = time_in_status_by_month(df, time_by_status)
 
+with st.expander("🔍 Debug: Tempo por Status Mensal", expanded=False):
+    st.write(f"**time_by_status shape:** {time_by_status.shape}")
+    st.write(f"**df (filtered) shape:** {df.shape}")
+    st.write(f"**df entregues (closed_date notna):** {df['closed_date'].notna().sum()}")
+    if not time_by_status.empty:
+        st.write(f"**time_by_status item_ids (amostra):** {list(time_by_status['item_id'].head(5))}")
+        st.write(f"**df ids (amostra):** {list(df['id'].head(5))}")
+        ids_comuns = set(time_by_status['item_id']).intersection(set(df['id']))
+        st.write(f"**IDs em comum:** {len(ids_comuns)}")
+    st.write(f"**monthly_pct shape:** {monthly_pct.shape}")
+    if not monthly_pct.empty:
+        st.dataframe(monthly_pct.head())
+
 if not monthly_pct.empty:
-    status_cols = [c for c in config.ALL_STATUSES if c in monthly_pct.columns]
+    status_cols = [c for c in monthly_pct.columns if c != "month"]
     fig_stack = stacked_bar_pct_monthly(monthly_pct, "month", status_cols,
                                          "Tempo por Status - Geral")
     st.plotly_chart(fig_stack, use_container_width=True)

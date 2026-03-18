@@ -15,8 +15,8 @@ LAYOUT_DEFAULTS = dict(
     plot_bgcolor="white",
     paper_bgcolor="white",
     font=dict(family="Segoe UI, Arial", size=12),
-    margin=dict(l=20, r=20, t=40, b=20),
-    legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0),
+    margin=dict(l=20, r=20, t=40, b=60),
+    legend=dict(orientation="h", yanchor="top", y=-0.15, xanchor="center", x=0.5),
 )
 
 
