@@ -9,11 +9,13 @@ import config
 
 def _compute_touch_time(time_by_status_df: pd.DataFrame) -> pd.DataFrame:
     """
-    Calcula touch_time por item a partir das colunas de status reais.
+    Calcula touch_time_q por item a partir das colunas de status reais.
     Usa classify_states para identificar estados ativos automaticamente.
+    Retorna colunas ["item_id", "touch_time_q"] para evitar conflito com
+    a coluna touch_time já existente nos itens enriquecidos.
     """
     if time_by_status_df.empty:
-        return pd.DataFrame(columns=["item_id", "touch_time"])
+        return pd.DataFrame(columns=["item_id", "touch_time_q"])
 
     from data.processor import classify_states
     status_cols = [c for c in time_by_status_df.columns if c != "item_id"]
@@ -21,10 +23,10 @@ def _compute_touch_time(time_by_status_df: pd.DataFrame) -> pd.DataFrame:
 
     tbs = time_by_status_df.copy()
     if active_states:
-        tbs["touch_time"] = tbs[[c for c in active_states if c in tbs.columns]].sum(axis=1)
+        tbs["touch_time_q"] = tbs[[c for c in active_states if c in tbs.columns]].sum(axis=1)
     else:
-        tbs["touch_time"] = 0.0
-    return tbs[["item_id", "touch_time"]]
+        tbs["touch_time_q"] = 0.0
+    return tbs[["item_id", "touch_time_q"]]
 
 
 # ─── Taxa de Retrabalho ───────────────────────────────────────────────────────
@@ -43,15 +45,15 @@ def rework_rate_by_month(df: pd.DataFrame, time_by_status_df: pd.DataFrame) -> p
     tbs_touch = _compute_touch_time(time_by_status_df)
     if not tbs_touch.empty:
         merged = delivered.merge(tbs_touch, left_on="id", right_on="item_id", how="left")
-        merged["touch_time"] = merged["touch_time"].fillna(0)
+        merged["touch_time_q"] = merged["touch_time_q"].fillna(0)
     else:
         merged = delivered.copy()
-        merged["touch_time"] = merged["cycle_time"].fillna(0)
+        merged["touch_time_q"] = merged.get("cycle_time", pd.Series(0, index=merged.index)).fillna(0)
 
     rows = []
     for month, group in merged.groupby("month"):
-        bugs = group[group["item_type_general"] == "Defeito"]["touch_time"].sum()
-        histories = group[group["item_type_general"] == "História"]["touch_time"].sum()
+        bugs = group[group["item_type_general"] == "Defeito"]["touch_time_q"].sum()
+        histories = group[group["item_type_general"] == "História"]["touch_time_q"].sum()
         total = bugs + histories
         rate = round(bugs / total * 100, 1) if total > 0 else 0.0
         rows.append({"month": month.to_timestamp(), "rework_rate": rate})
@@ -70,15 +72,15 @@ def rework_rate_by_team_month(df: pd.DataFrame, time_by_status_df: pd.DataFrame)
     tbs_touch = _compute_touch_time(time_by_status_df)
     if not tbs_touch.empty:
         merged = delivered.merge(tbs_touch, left_on="id", right_on="item_id", how="left")
-        merged["touch_time"] = merged["touch_time"].fillna(0)
+        merged["touch_time_q"] = merged["touch_time_q"].fillna(0)
     else:
         merged = delivered.copy()
-        merged["touch_time"] = merged["cycle_time"].fillna(0)
+        merged["touch_time_q"] = merged.get("cycle_time", pd.Series(0, index=merged.index)).fillna(0)
 
     rows = []
     for (team, month), group in merged.groupby(["team", "month"]):
-        bugs = group[group["item_type_general"] == "Defeito"]["touch_time"].sum()
-        histories = group[group["item_type_general"] == "História"]["touch_time"].sum()
+        bugs = group[group["item_type_general"] == "Defeito"]["touch_time_q"].sum()
+        histories = group[group["item_type_general"] == "História"]["touch_time_q"].sum()
         total = bugs + histories
         rate = round(bugs / total * 100, 1) if total > 0 else 0.0
         rows.append({"team": team, "month": month.to_timestamp(), "rework_rate": rate})
@@ -102,10 +104,10 @@ def rework_trend_weekly(df: pd.DataFrame, time_by_status_df: pd.DataFrame) -> pd
     tbs_touch = _compute_touch_time(time_by_status_df)
     if not tbs_touch.empty:
         merged = delivered.merge(tbs_touch, left_on="id", right_on="item_id", how="left")
-        merged["touch_time"] = merged["touch_time"].fillna(0)
+        merged["touch_time_q"] = merged["touch_time_q"].fillna(0)
     else:
         merged = delivered.copy()
-        merged["touch_time"] = merged["cycle_time"].fillna(0)
+        merged["touch_time_q"] = merged.get("cycle_time", pd.Series(0, index=merged.index)).fillna(0)
 
     merged["week_ordinal"] = merged["closed_date"].apply(
         lambda x: (x.year - 2020) * 52 + x.isocalendar()[1] if not pd.isna(x) else None
@@ -113,8 +115,8 @@ def rework_trend_weekly(df: pd.DataFrame, time_by_status_df: pd.DataFrame) -> pd
 
     rows = []
     for week, group in merged.groupby("week_ordinal"):
-        bugs = group[group["item_type_general"] == "Defeito"]["touch_time"].sum()
-        histories = group[group["item_type_general"] == "História"]["touch_time"].sum()
+        bugs = group[group["item_type_general"] == "Defeito"]["touch_time_q"].sum()
+        histories = group[group["item_type_general"] == "História"]["touch_time_q"].sum()
         total = bugs + histories
         rate = round(bugs / total * 100, 1) if total > 0 else 0.0
         rows.append({"week_ordinal": week, "rework_rate": rate})
