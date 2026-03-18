@@ -154,8 +154,8 @@ def add_delivery_period(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
     if "closed_date" in df.columns:
         df["delivery_month"] = df["closed_date"].dt.to_period("M")
-        df["delivery_week"] = df["closed_date"].dt.isocalendar().week.astype(int)
-        df["delivery_year"] = df["closed_date"].dt.year
+        df["delivery_week"] = df["closed_date"].dt.isocalendar().week.astype("Int64")
+        df["delivery_year"] = df["closed_date"].dt.year.astype("Int64")
         df["delivery_week_num"] = (
             df["closed_date"].dt.to_period("W").apply(lambda x: x.ordinal if not pd.isna(x) else None)
         )
