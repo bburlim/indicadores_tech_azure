@@ -7,6 +7,26 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 import config
 
 
+def _compute_touch_time(time_by_status_df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Calcula touch_time por item a partir das colunas de status reais.
+    Usa classify_states para identificar estados ativos automaticamente.
+    """
+    if time_by_status_df.empty:
+        return pd.DataFrame(columns=["item_id", "touch_time"])
+
+    from data.processor import classify_states
+    status_cols = [c for c in time_by_status_df.columns if c != "item_id"]
+    active_states, _ = classify_states(status_cols)
+
+    tbs = time_by_status_df.copy()
+    if active_states:
+        tbs["touch_time"] = tbs[[c for c in active_states if c in tbs.columns]].sum(axis=1)
+    else:
+        tbs["touch_time"] = 0.0
+    return tbs[["item_id", "touch_time"]]
+
+
 # ─── Taxa de Retrabalho ───────────────────────────────────────────────────────
 
 def rework_rate_by_month(df: pd.DataFrame, time_by_status_df: pd.DataFrame) -> pd.DataFrame:
@@ -20,14 +40,11 @@ def rework_rate_by_month(df: pd.DataFrame, time_by_status_df: pd.DataFrame) -> p
     delivered = df[df["closed_date"].notna()].copy()
     delivered["month"] = delivered["closed_date"].dt.to_period("M")
 
-    if not time_by_status_df.empty and "item_id" in time_by_status_df.columns:
-        touch_cols = [c for c in config.ACTIVE_STATUSES if c in time_by_status_df.columns]
-        tbs = time_by_status_df.copy()
-        tbs["touch_time"] = tbs[touch_cols].sum(axis=1) if touch_cols else 0
-        merged = delivered.merge(tbs[["item_id", "touch_time"]], left_on="id", right_on="item_id", how="left")
+    tbs_touch = _compute_touch_time(time_by_status_df)
+    if not tbs_touch.empty:
+        merged = delivered.merge(tbs_touch, left_on="id", right_on="item_id", how="left")
         merged["touch_time"] = merged["touch_time"].fillna(0)
     else:
-        # Fallback: usa cycle_time como proxy
         merged = delivered.copy()
         merged["touch_time"] = merged["cycle_time"].fillna(0)
 
@@ -50,11 +67,9 @@ def rework_rate_by_team_month(df: pd.DataFrame, time_by_status_df: pd.DataFrame)
     delivered = df[df["closed_date"].notna()].copy()
     delivered["month"] = delivered["closed_date"].dt.to_period("M")
 
-    if not time_by_status_df.empty:
-        touch_cols = [c for c in config.ACTIVE_STATUSES if c in time_by_status_df.columns]
-        tbs = time_by_status_df.copy()
-        tbs["touch_time"] = tbs[touch_cols].sum(axis=1) if touch_cols else 0
-        merged = delivered.merge(tbs[["item_id", "touch_time"]], left_on="id", right_on="item_id", how="left")
+    tbs_touch = _compute_touch_time(time_by_status_df)
+    if not tbs_touch.empty:
+        merged = delivered.merge(tbs_touch, left_on="id", right_on="item_id", how="left")
         merged["touch_time"] = merged["touch_time"].fillna(0)
     else:
         merged = delivered.copy()
@@ -84,11 +99,10 @@ def rework_trend_weekly(df: pd.DataFrame, time_by_status_df: pd.DataFrame) -> pd
 
     delivered = df[df["closed_date"].notna()].copy()
 
-    if not time_by_status_df.empty:
-        touch_cols = [c for c in config.ACTIVE_STATUSES if c in time_by_status_df.columns]
-        tbs = time_by_status_df.copy()
-        tbs["touch_time"] = tbs[touch_cols].sum(axis=1) if touch_cols else 0
-        merged = delivered.merge(tbs[["item_id", "touch_time"]], left_on="id", right_on="item_id", how="left")
+    tbs_touch = _compute_touch_time(time_by_status_df)
+    if not tbs_touch.empty:
+        merged = delivered.merge(tbs_touch, left_on="id", right_on="item_id", how="left")
+        merged["touch_time"] = merged["touch_time"].fillna(0)
     else:
         merged = delivered.copy()
         merged["touch_time"] = merged["cycle_time"].fillna(0)
