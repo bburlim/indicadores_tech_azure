@@ -17,8 +17,14 @@ def flow_efficiency_per_item(items_df: pd.DataFrame, time_by_status_df: pd.DataF
 
     tbs = time_by_status_df.copy()
 
-    touch_cols = [c for c in config.ACTIVE_STATUSES if c in tbs.columns]
-    wait_cols = [c for c in config.WAIT_STATUSES if c in tbs.columns]
+    # Auto-classifica os estados reais encontrados no time_by_status
+    from data.processor import classify_states
+    status_cols = [c for c in tbs.columns if c != "item_id"]
+    active_states, wait_states = classify_states(status_cols)
+
+    # Fallback para os nomes do config se a auto-detecção não encontrou nada
+    touch_cols = active_states if active_states else [c for c in config.ACTIVE_STATUSES if c in tbs.columns]
+    wait_cols = wait_states if wait_states else [c for c in config.WAIT_STATUSES if c in tbs.columns]
 
     tbs["touch_time"] = tbs[touch_cols].sum(axis=1)
     tbs["wait_time"] = tbs[wait_cols].sum(axis=1)
@@ -79,12 +85,12 @@ def time_in_status_totals(time_by_status_df: pd.DataFrame) -> pd.DataFrame:
     if time_by_status_df.empty:
         return pd.DataFrame()
 
-    all_statuses = config.ACTIVE_STATUSES + config.WAIT_STATUSES
-    cols = [c for c in all_statuses if c in time_by_status_df.columns]
+    # Usa todos os status presentes no DataFrame (auto-detectados)
+    cols = [c for c in time_by_status_df.columns if c != "item_id"]
     totals = time_by_status_df[cols].sum().reset_index()
     totals.columns = ["status", "hours"]
     totals["hours"] = totals["hours"].round(0)
-    return totals.sort_values("hours", ascending=False)
+    return totals[totals["hours"] > 0].sort_values("hours", ascending=False)
 
 
 def time_in_status_by_month(items_df: pd.DataFrame, time_by_status_df: pd.DataFrame) -> pd.DataFrame:
@@ -99,8 +105,8 @@ def time_in_status_by_month(items_df: pd.DataFrame, time_by_status_df: pd.DataFr
     delivered = merged[merged["closed_date"].notna()].copy()
     delivered["month"] = delivered["closed_date"].dt.to_period("M")
 
-    all_statuses = config.ACTIVE_STATUSES + config.WAIT_STATUSES
-    cols = [c for c in all_statuses if c in delivered.columns]
+    cols = [c for c in time_by_status_df.columns if c not in ("item_id", "closed_date", "month")]
+    cols = [c for c in cols if c in delivered.columns]
 
     monthly = delivered.groupby("month")[cols].sum()
     row_totals = monthly.sum(axis=1)

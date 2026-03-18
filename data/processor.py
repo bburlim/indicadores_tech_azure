@@ -49,33 +49,61 @@ def business_hours_between(start: datetime, end: datetime) -> float:
     return min(total_hours, (end.date() - start.date()).days * config.MAX_HOURS_PER_DAY + config.MAX_HOURS_PER_DAY)
 
 
+def classify_states(states) -> tuple:
+    """
+    Auto-classifica estados como ativos (touch time) ou espera (wait time)
+    com base em palavras-chave, sem depender de nomes hardcoded.
+    Retorna (active_states, wait_states).
+    """
+    active_kw = [
+        "in progress", "progress", "em andamento", "desenvolvimento",
+        "review", "revisão", "revisao", "qa", "quality", "teste", "testing",
+        "releasing", "release", "infra", "dev adjust", "doing", "homolog",
+    ]
+    wait_kw = [
+        "waiting", "wait", "aguardando", "selected", "queue", "fila",
+        "blocked", "bloqueado", "pending", "pendente", "to do", "todo",
+        "backlog", "new", "novo", "ready",
+    ]
+    terminal_kw = ["done", "closed", "resolved", "cancelled", "removed",
+                   "concluído", "concluido", "cancelado"]
+
+    active, wait = [], []
+    for s in states:
+        sl = s.lower()
+        if any(k in sl for k in terminal_kw):
+            continue
+        if any(k in sl for k in active_kw):
+            active.append(s)
+        else:
+            wait.append(s)
+    return active, wait
+
+
 def compute_time_in_status(history_df: pd.DataFrame, items_df: pd.DataFrame) -> pd.DataFrame:
     """
     Para cada item, calcula o tempo (horas úteis) em cada status.
+    Usa todos os estados encontrados no histórico (não apenas os do config).
     Retorna DataFrame: item_id x status = horas
     """
     if history_df.empty:
         return pd.DataFrame()
 
+    # Usa todos os estados reais do histórico
+    all_states = [s for s in history_df["to_state"].dropna().unique() if s]
     results = []
 
     for item_id, group in history_df.groupby("item_id"):
         group = group.sort_values("changed_date").reset_index(drop=True)
 
-        # Pega data de criação como primeiro momento
         item_row = items_df[items_df["id"] == item_id]
-        created = item_row["created_date"].iloc[0] if not item_row.empty else group["changed_date"].iloc[0]
         closed = item_row["closed_date"].iloc[0] if not item_row.empty else None
 
-        # Constrói lista de períodos por status
-        status_hours = {s: 0.0 for s in config.ALL_STATUSES}
+        status_hours = {s: 0.0 for s in all_states}
 
-        # O primeiro estado é o primeiro to_state (ou pega do item)
-        transitions = []
-        for _, row in group.iterrows():
-            transitions.append({"state": row["to_state"], "start": row["changed_date"]})
+        transitions = [{"state": row["to_state"], "start": row["changed_date"]}
+                       for _, row in group.iterrows()]
 
-        # Adiciona fim de cada período
         for i, t in enumerate(transitions):
             next_start = transitions[i + 1]["start"] if i + 1 < len(transitions) else (closed or pd.Timestamp.now(tz="UTC"))
             if t["state"] in status_hours:
