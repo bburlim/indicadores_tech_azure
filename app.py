@@ -41,6 +41,13 @@ with st.expander("⚙️ Configuração — Azure DevOps", expanded="items_df" n
     start_date = c1.date_input("Data início", value=date(date.today().year, 1, 1))
     end_date = c2.date_input("Data fim", value=date.today())
 
+    st.markdown("**Backlog em aberto**")
+    backlog_window = st.slider(
+        "Janela de criação do backlog (dias atrás)",
+        min_value=30, max_value=730, value=180, step=30,
+        help="Itens abertos criados há mais tempo que isso são ignorados. Reduz o volume de dados sem afetar os indicadores do período selecionado.",
+    )
+
     load_btn = st.button("🔄 Carregar Dados", type="primary")
 
 # ─── Carregamento ─────────────────────────────────────────────────────────────
@@ -59,7 +66,7 @@ if load_btn:
         from data.processor import enrich_items
 
         with st.spinner("Buscando work items..."):
-            items_df = fetch_work_items(str(start_date), str(end_date))
+            items_df = fetch_work_items(str(start_date), str(end_date), backlog_window_days=backlog_window)
 
         if items_df.empty:
             st.warning("Nenhum item encontrado para o período e filtros selecionados.")

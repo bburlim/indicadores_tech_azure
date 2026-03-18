@@ -125,15 +125,26 @@ def fetch_work_items(
     start_date: str,
     end_date: str,
     work_item_types: Optional[list] = None,
+    backlog_window_days: int = 180,
 ) -> pd.DataFrame:
     """
-    Busca work items entregues (Done/Closed) no período e items em aberto.
-    Retorna DataFrame com campos básicos.
+    Busca work items entregues no período + backlog ativo recente.
+
+    Para evitar trazer o histórico inteiro do projeto:
+    - Entregues: filtro exato por ClosedDate no período selecionado.
+    - Backlog aberto: somente itens criados nos últimos `backlog_window_days`
+      (padrão 180 dias). Itens muito antigos sem entrega raramente impactam
+      os indicadores do período atual.
     """
+    from datetime import datetime, timedelta
+
     types_filter = ""
     if work_item_types:
         types_str = ", ".join(f"'{t}'" for t in work_item_types)
         types_filter = f"AND [System.WorkItemType] IN ({types_str})"
+
+    # Janela de criação para o backlog aberto
+    backlog_since = (datetime.now() - timedelta(days=backlog_window_days)).strftime("%Y-%m-%d")
 
     wiql = f"""
     SELECT [System.Id]
@@ -146,7 +157,10 @@ def fetch_work_items(
             AND [Microsoft.VSTS.Common.ClosedDate] >= '{start_date}'
             AND [Microsoft.VSTS.Common.ClosedDate] <= '{end_date}'
         )
-        OR [System.State] NOT IN ('Done', 'Closed', 'Resolved', 'Removed')
+        OR (
+            [System.State] NOT IN ('Done', 'Closed', 'Resolved', 'Removed')
+            AND [System.CreatedDate] >= '{backlog_since}'
+        )
     )
     ORDER BY [System.Id] DESC
     """
@@ -158,7 +172,6 @@ def fetch_work_items(
     if not ids:
         return pd.DataFrame()
 
-    # Descobre campos customizados
     field_map = discover_custom_fields()
     return _fetch_item_details(ids, field_map)
 
