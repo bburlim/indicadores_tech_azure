@@ -1,5 +1,6 @@
 """Página: Produtividade - Abertura, Entregas, Backlog e Vazão."""
 import streamlit as st
+import pandas as pd
 import sys, os
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
