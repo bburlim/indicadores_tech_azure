@@ -204,9 +204,12 @@ def filter_items(
         result = result[result["closed_date"].notna()]
 
     if start_date and "closed_date" in result.columns:
-        result = result[result["closed_date"].dt.tz_localize(None) >= pd.Timestamp(start_date)]
+        # Itens sem closed_date (backlog aberto) sempre passam pelo filtro
+        closed_naive = result["closed_date"].dt.tz_convert(None)
+        result = result[result["closed_date"].isna() | (closed_naive >= pd.Timestamp(start_date))]
     if end_date and "closed_date" in result.columns:
-        result = result[result["closed_date"].dt.tz_localize(None) <= pd.Timestamp(end_date) + pd.Timedelta(days=1)]
+        closed_naive = result["closed_date"].dt.tz_convert(None)
+        result = result[result["closed_date"].isna() | (closed_naive <= pd.Timestamp(end_date) + pd.Timedelta(days=1))]
 
     if teams:
         result = result[result["team"].isin(teams)]
