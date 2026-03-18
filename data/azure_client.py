@@ -35,6 +35,17 @@ def _post(url: str, body: dict) -> dict:
     return resp.json()
 
 
+def _parse_azure_date(series: pd.Series) -> pd.Series:
+    """
+    Converte série de datas do Azure DevOps para datetime UTC.
+    O Azure usa '9999-01-01T00:00:00Z' como sentinela para 'sem data fim' —
+    esses valores são convertidos para NaT.
+    """
+    # Substitui o sentinel antes de parsear
+    cleaned = series.replace("9999-01-01T00:00:00Z", None)
+    return pd.to_datetime(cleaned, format="ISO8601", utc=True, errors="coerce")
+
+
 @st.cache_data(ttl=config.CACHE_TTL, show_spinner="Descobrindo campos do Azure DevOps...")
 def discover_custom_fields() -> dict:
     """
@@ -221,8 +232,8 @@ def _fetch_item_details(ids: list, field_map: dict) -> pd.DataFrame:
     if df.empty:
         return df
 
-    df["created_date"] = pd.to_datetime(df["created_date"], format="ISO8601", utc=True)
-    df["closed_date"] = pd.to_datetime(df["closed_date"], format="ISO8601", utc=True)
+    df["created_date"] = _parse_azure_date(df["created_date"])
+    df["closed_date"] = _parse_azure_date(df["closed_date"])
     df["item_type_general"] = df["type"].apply(_classify_type_general)
 
     return df
@@ -302,7 +313,7 @@ def fetch_state_history(item_ids: tuple, max_workers: int = 20) -> pd.DataFrame:
         return pd.DataFrame(columns=["item_id", "from_state", "to_state", "changed_date"])
 
     df = pd.DataFrame(all_rows)
-    df["changed_date"] = pd.to_datetime(df["changed_date"], format="ISO8601", utc=True)
+    df["changed_date"] = _parse_azure_date(df["changed_date"])
     df = df.sort_values(["item_id", "changed_date"]).reset_index(drop=True)
     return df
 
