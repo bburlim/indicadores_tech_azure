@@ -1,11 +1,12 @@
-"""Página principal: configuração de credenciais e carregamento de dados."""
+"""Página principal: seleção de período e carregamento de dados."""
 import streamlit as st
 import pandas as pd
-from datetime import date, timedelta
+from datetime import date
 import os
 import sys
 
 sys.path.insert(0, os.path.dirname(__file__))
+import config
 
 st.set_page_config(
     page_title="Indicadores de Eficiência de Tecnologia",
@@ -21,84 +22,75 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# ─── Configuração de Credenciais ──────────────────────────────────────────────
-with st.expander("⚙️ Configuração — Azure DevOps", expanded="items_df" not in st.session_state):
+# Valida se as credenciais estão configuradas
+if not config.AZURE_ORG or not config.AZURE_PROJECT or not config.AZURE_PAT:
+    st.error(
+        "Credenciais do Azure DevOps não configuradas. "
+        "Preencha `AZURE_DEVOPS_ORG`, `AZURE_DEVOPS_PROJECT` e `AZURE_DEVOPS_PAT` "
+        "no arquivo `.env` (local) ou em **Settings → Secrets** no Streamlit Cloud."
+    )
+    st.code("""
+# .env
+AZURE_DEVOPS_ORG=emiteai
+AZURE_DEVOPS_PROJECT=seu-projeto
+AZURE_DEVOPS_PAT=seu-pat-aqui
+    """)
+    st.stop()
+
+# ─── Controles de carregamento ────────────────────────────────────────────────
+with st.expander("⚙️ Período e opções de carregamento", expanded="items_df" not in st.session_state):
     col1, col2 = st.columns(2)
     with col1:
-        azure_org = st.text_input("Organização", value=os.getenv("AZURE_DEVOPS_ORG", ""),
-                                   placeholder="minha-org", key="azure_org")
-        azure_project = st.text_input("Projeto", value=os.getenv("AZURE_DEVOPS_PROJECT", ""),
-                                       placeholder="meu-projeto", key="azure_project")
+        start_date = col1.date_input("Data início", value=date(date.today().year, 1, 1))
+        end_date = col2.date_input("Data fim", value=date.today())
     with col2:
-        azure_pat = st.text_input("Personal Access Token (PAT)", value=os.getenv("AZURE_DEVOPS_PAT", ""),
-                                   type="password", key="azure_pat",
-                                   help="Crie um PAT com permissão de leitura em Work Items")
-        load_history = st.checkbox("Carregar histórico de estados (mais lento, necessário para Tempo por Status e Eficiência de Fluxo)",
-                                    value=True)
-
-    st.markdown("**Período de Entrega**")
-    c1, c2 = st.columns(2)
-    start_date = c1.date_input("Data início", value=date(date.today().year, 1, 1))
-    end_date = c2.date_input("Data fim", value=date.today())
-
-    st.markdown("**Backlog em aberto**")
-    backlog_window = st.slider(
-        "Janela de criação do backlog (dias atrás)",
-        min_value=30, max_value=730, value=180, step=30,
-        help="Itens abertos criados há mais tempo que isso são ignorados. Reduz o volume de dados sem afetar os indicadores do período selecionado.",
-    )
+        load_history = st.checkbox(
+            "Carregar histórico de estados",
+            value=True,
+            help="Necessário para Tempo por Status e Eficiência de Fluxo. Mais lento na primeira carga.",
+        )
+        backlog_window = st.slider(
+            "Janela do backlog aberto (dias atrás)",
+            min_value=30, max_value=730, value=180, step=30,
+            help="Itens abertos criados há mais tempo que isso são ignorados.",
+        )
 
     load_btn = st.button("🔄 Carregar Dados", type="primary")
 
 # ─── Carregamento ─────────────────────────────────────────────────────────────
 if load_btn:
-    if not azure_org or not azure_project or not azure_pat:
-        st.error("Preencha Organização, Projeto e PAT antes de carregar os dados.")
+    from data.azure_client import fetch_work_items, fetch_state_history
+    from data.processor import enrich_items
+
+    with st.spinner("Buscando work items..."):
+        items_df = fetch_work_items(str(start_date), str(end_date), backlog_window_days=backlog_window)
+
+    if items_df.empty:
+        st.warning("Nenhum item encontrado para o período selecionado.")
     else:
-        # Atualiza config dinâmico
-        import config
-        config.AZURE_ORG = azure_org
-        config.AZURE_PROJECT = azure_project
-        config.AZURE_PAT = azure_pat
-        config.AZURE_BASE_URL = f"https://dev.azure.com/{azure_org}/{azure_project}/_apis"
+        st.success(f"✅ {len(items_df)} itens carregados.")
 
-        from data.azure_client import fetch_work_items, fetch_state_history
-        from data.processor import enrich_items
+        history_df = pd.DataFrame()
+        if load_history:
+            delivered_ids = tuple(items_df[items_df["closed_date"].notna()]["id"].tolist())
+            st.info(
+                f"🔎 Buscando histórico de {len(delivered_ids)} itens entregues "
+                f"(de {len(items_df)} total) em paralelo..."
+            )
+            history_df = fetch_state_history(delivered_ids)
+            st.success(f"✅ {len(history_df)} transições de estado carregadas.")
 
-        with st.spinner("Buscando work items..."):
-            items_df = fetch_work_items(str(start_date), str(end_date), backlog_window_days=backlog_window)
+        with st.spinner("Calculando métricas..."):
+            from metrics.flow_efficiency import flow_efficiency_per_item
+            items_enriched, time_by_status = enrich_items(items_df, history_df)
+            if not time_by_status.empty:
+                items_enriched = flow_efficiency_per_item(items_enriched, time_by_status)
 
-        if items_df.empty:
-            st.warning("Nenhum item encontrado para o período e filtros selecionados.")
-        else:
-            st.success(f"✅ {len(items_df)} itens carregados.")
-
-            history_df = pd.DataFrame()
-            if load_history:
-                # Histórico só é necessário para itens entregues (ciclo completo)
-                # Itens em aberto no backlog não têm closed_date e não precisam de histórico
-                delivered_ids = tuple(
-                    items_df[items_df["closed_date"].notna()]["id"].tolist()
-                )
-                total_items = len(items_df)
-                st.info(
-                    f"🔎 {len(delivered_ids)} itens entregues (de {total_items} total) "
-                    f"— buscando histórico de estados em paralelo..."
-                )
-                history_df = fetch_state_history(delivered_ids)
-                st.success(f"✅ {len(history_df)} transições de estado carregadas.")
-
-            with st.spinner("Calculando métricas..."):
-                from metrics.flow_efficiency import flow_efficiency_per_item
-                items_enriched, time_by_status = enrich_items(items_df, history_df)
-                if not time_by_status.empty:
-                    items_enriched = flow_efficiency_per_item(items_enriched, time_by_status)
-
-            st.session_state["items_df"] = items_enriched
-            st.session_state["history_df"] = history_df
-            st.session_state["time_by_status_df"] = time_by_status
-            st.session_state["filtered_df"] = items_enriched.copy()
-            st.rerun()
+        st.session_state["items_df"] = items_enriched
+        st.session_state["history_df"] = history_df
+        st.session_state["time_by_status_df"] = time_by_status
+        st.session_state["filtered_df"] = items_enriched.copy()
+        st.rerun()
 
 # ─── Filtros Globais (sidebar) ────────────────────────────────────────────────
 if "items_df" in st.session_state and st.session_state.items_df is not None:
@@ -106,7 +98,6 @@ if "items_df" in st.session_state and st.session_state.items_df is not None:
 
     st.sidebar.header("🔍 Filtros Globais")
 
-    # Datas
     all_dates = df["closed_date"].dropna()
     min_d = all_dates.min().date() if not all_dates.empty else date(2025, 1, 1)
     max_d = all_dates.max().date() if not all_dates.empty else date.today()
@@ -129,7 +120,6 @@ if "items_df" in st.session_state and st.session_state.items_df is not None:
     platform = ms("Plataforma", "platform")
     book_team = ms("Equipe Book de Tech", "book_team")
 
-    # Aplica filtros
     from data.processor import filter_items
     filtered = filter_items(
         df,
@@ -159,7 +149,6 @@ if "items_df" in st.session_state and st.session_state.items_df is not None:
     m4.metric("Equipes", filtered["team"].nunique())
     m5.metric("Data Atualização", pd.Timestamp.now().strftime("%m/%d/%Y %H:%M"))
 
-    # Preview
     st.markdown("**Preview dos Itens** (10 primeiros entregues)")
     preview_cols = ["id", "title", "team", "type", "state", "created_date", "closed_date", "cycle_time", "lead_time", "vazao_qualificada"]
     preview = delivered[[c for c in preview_cols if c in delivered.columns]].head(10)
@@ -169,27 +158,12 @@ if "items_df" in st.session_state and st.session_state.items_df is not None:
 
 else:
     st.markdown("""
-    ## Como usar
+    Selecione o período desejado e clique em **Carregar Dados** para iniciar.
 
-    1. **Configure as credenciais** do Azure DevOps acima (Organização, Projeto, PAT)
-    2. **Selecione o período** de entrega desejado
-    3. Clique em **Carregar Dados**
-    4. Use os **filtros** na sidebar para refinar a visualização
-    5. Navegue pelas **páginas** de indicadores no menu lateral
-
-    ---
-
-    ### Páginas disponíveis:
-    - **Produtividade**: Throughput, Backlog, Vazão Qualificada
-    - **Lead/Cycle Time**: P85, Desvio Padrão, por Equipe, Tendências
-    - **Eficiência de Fluxo**: Touch Time vs. Wait Time por mês e equipe
-    - **Qualidade**: Retrabalho, Saúde Backlog, SLA, Defeitos por Origem
-    - **Tempo por Status**: Horas em cada status (horas úteis), visão mensal
-
-    ---
-
-    ### Como criar um PAT no Azure DevOps:
-    1. Acesse `https://dev.azure.com/{sua-org}` → User Settings → Personal Access Tokens
-    2. Crie um novo token com permissão **Work Items: Read**
-    3. Cole o token acima
+    **Páginas disponíveis após o carregamento:**
+    - **Produtividade** — Throughput, Backlog, Burn-down, Vazão Qualificada
+    - **Lead/Cycle Time** — P85, Desvio Padrão, por Equipe, Tendências
+    - **Eficiência de Fluxo** — Touch Time vs. Wait Time
+    - **Qualidade** — Retrabalho, Saúde Backlog, SLA, Defeitos por Origem
+    - **Tempo por Status** — Horas úteis em cada status
     """)
