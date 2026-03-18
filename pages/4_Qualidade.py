@@ -37,14 +37,10 @@ st.subheader("Aberturas, entregas e backlog de defeitos")
 rw_month = rework_rate_by_month(df_filtered, time_by_status)
 rw_geral = rw_month["rework_rate"].mean() if not rw_month.empty else 0
 
-col1, col2, col3, col4, col5 = st.columns(5)
+col1, = st.columns(1)
 col1.markdown(kpi_card("Percentual de Retrabalho", f"{rw_geral:.1f}%",
                "#FF0000" if rw_geral > config.REWORK_BENCH else "#228B22"),
                unsafe_allow_html=True)
-col2.markdown(kpi_card("1ª Triagem (Corretivas)", "--"), unsafe_allow_html=True)
-col3.markdown(kpi_card("Resolução (Corretivas)", "--"), unsafe_allow_html=True)
-col4.markdown(kpi_card("1ª Resposta (Evolutivas)", "--"), unsafe_allow_html=True)
-col5.markdown(kpi_card("Entrega (Evolutivas)", "--"), unsafe_allow_html=True)
 
 # ─── Abertura x Defeitos Entregues ────────────────────────────────────────────
 bugs_delivered_month = defects_delivered_by_origin_month(df_filtered)
