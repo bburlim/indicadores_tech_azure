@@ -68,9 +68,17 @@ if load_btn:
 
             history_df = pd.DataFrame()
             if load_history:
-                item_ids = tuple(items_df["id"].tolist())
-                with st.spinner(f"Buscando histórico de {len(item_ids)} itens..."):
-                    history_df = fetch_state_history(item_ids)
+                # Histórico só é necessário para itens entregues (ciclo completo)
+                # Itens em aberto no backlog não têm closed_date e não precisam de histórico
+                delivered_ids = tuple(
+                    items_df[items_df["closed_date"].notna()]["id"].tolist()
+                )
+                total_items = len(items_df)
+                st.info(
+                    f"🔎 {len(delivered_ids)} itens entregues (de {total_items} total) "
+                    f"— buscando histórico de estados em paralelo..."
+                )
+                history_df = fetch_state_history(delivered_ids)
                 st.success(f"✅ {len(history_df)} transições de estado carregadas.")
 
             with st.spinner("Calculando métricas..."):

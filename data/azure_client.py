@@ -242,26 +242,34 @@ def _classify_type_general(work_item_type: str) -> str:
     return "História"
 
 
-@st.cache_data(ttl=config.CACHE_TTL, show_spinner="Buscando histórico de estados...")
-def fetch_state_history(item_ids: tuple) -> pd.DataFrame:
+@st.cache_data(ttl=config.CACHE_TTL, show_spinner=False)
+def fetch_state_history(item_ids: tuple, max_workers: int = 20) -> pd.DataFrame:
     """
-    Busca o histórico de mudanças de estado para uma lista de IDs.
-    Retorna DataFrame com: item_id, from_state, to_state, changed_date
+    Busca o histórico de mudanças de estado em paralelo.
+    Recomenda-se passar apenas IDs de itens entregues (closed_date não nulo).
+
+    Args:
+        item_ids: tupla de IDs (deve ser tupla para o cache funcionar)
+        max_workers: número de requisições paralelas (padrão 20)
     """
-    rows = []
-    for item_id in item_ids:
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
+    all_rows = []
+    lock_rows = []  # acumulador thread-safe via lista
+
+    progress_bar = st.progress(0, text=f"Buscando histórico de 0/{len(item_ids)} itens...")
+    completed = [0]  # lista para permitir mutação no closure
+
+    def _fetch_one(item_id: int) -> list:
         url = f"{config.AZURE_BASE_URL}/wit/workitems/{item_id}/updates?api-version=7.1"
+        rows = []
         try:
             data = _get(url)
-        except Exception:
-            continue
-
-        for update in data.get("value", []):
-            fields = update.get("fields", {})
-            state_change = fields.get("System.State")
-            if state_change:
-                rows.append(
-                    {
+            for update in data.get("value", []):
+                fields = update.get("fields", {})
+                state_change = fields.get("System.State")
+                if state_change:
+                    rows.append({
                         "item_id": item_id,
                         "from_state": state_change.get("oldValue", ""),
                         "to_state": state_change.get("newValue", ""),
@@ -271,13 +279,29 @@ def fetch_state_history(item_ids: tuple) -> pd.DataFrame:
                             .get("System.ChangedDate", {})
                             .get("newValue")
                         ),
-                    }
-                )
+                    })
+        except Exception:
+            pass
+        return rows
 
-    if not rows:
+    total = len(item_ids)
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = {executor.submit(_fetch_one, iid): iid for iid in item_ids}
+        for future in as_completed(futures):
+            all_rows.extend(future.result())
+            completed[0] += 1
+            pct = completed[0] / total
+            progress_bar.progress(
+                pct,
+                text=f"Buscando histórico: {completed[0]}/{total} itens ({pct*100:.0f}%)"
+            )
+
+    progress_bar.empty()
+
+    if not all_rows:
         return pd.DataFrame(columns=["item_id", "from_state", "to_state", "changed_date"])
 
-    df = pd.DataFrame(rows)
+    df = pd.DataFrame(all_rows)
     df["changed_date"] = pd.to_datetime(df["changed_date"], format="ISO8601", utc=True)
     df = df.sort_values(["item_id", "changed_date"]).reset_index(drop=True)
     return df
