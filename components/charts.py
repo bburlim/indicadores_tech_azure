@@ -79,11 +79,19 @@ def stacked_bar_pct_monthly(
     title: str,
 ) -> go.Figure:
     """Gráfico de barras empilhadas com percentual por status."""
+    import plotly.colors as pc
+    palette = pc.qualitative.Plotly + pc.qualitative.D3 + pc.qualitative.Set3
+    auto_color_idx = 0
+
     fig = go.Figure()
     for col in status_cols:
         if col not in df.columns:
             continue
-        color = config.STATUS_COLORS.get(col, "#aaaaaa")
+        if col in config.STATUS_COLORS:
+            color = config.STATUS_COLORS[col]
+        else:
+            color = palette[auto_color_idx % len(palette)]
+            auto_color_idx += 1
         texts = [f"{v:.1f}%" if v >= 4 else "" for v in df[col]]
         fig.add_trace(
             go.Bar(

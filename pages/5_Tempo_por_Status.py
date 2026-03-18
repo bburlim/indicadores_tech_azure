@@ -38,9 +38,12 @@ with col2:
                               "Tempo por Status (horas) - Geral")
         # Formata labels em K
         import plotly.graph_objects as go
+        import plotly.colors as pc
+        _palette = pc.qualitative.Plotly + pc.qualitative.D3 + pc.qualitative.Set3
+        _status_list = list(totals["status"])
         fig2 = go.Figure()
-        for _, row in totals.iterrows():
-            color = config.STATUS_COLORS.get(row["status"], "#aaaaaa")
+        for i, (_, row) in enumerate(totals.iterrows()):
+            color = config.STATUS_COLORS.get(row["status"], _palette[i % len(_palette)])
             label = f"{row['hours']/1000:.1f}K" if row["hours"] >= 1000 else f"{row['hours']:.0f}"
             fig2.add_trace(go.Bar(
                 y=[row["status"]],
