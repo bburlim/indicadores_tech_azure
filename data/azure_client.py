@@ -77,6 +77,8 @@ def discover_custom_fields() -> dict:
         "feature": ["funcionalidade", "feature"],
         "platform": ["plataforma", "platform"],
         "book_team": ["equipebookdetech", "bookoftech", "booktech"],
+        "categoria": ["categoria", "category"],
+        "chamado": ["chamado", "ticket", "incident"],
     }
 
     result = {}
@@ -117,6 +119,8 @@ def _default_field_map() -> dict:
         "feature": "Custom.Funcionalidade",
         "platform": "Custom.Plataforma",
         "book_team": "Custom.EquipeBookDeTech",
+        "categoria": "Custom.Categoria",
+        "chamado": "Custom.Chamado",
     }
 
 
@@ -238,6 +242,8 @@ def _fetch_item_details(ids: list, field_map: dict) -> pd.DataFrame:
                 "feature": f.get(field_map.get("feature", "Custom.Funcionalidade"), ""),
                 "platform": f.get(field_map.get("platform", "Custom.Plataforma"), ""),
                 "book_team": f.get(field_map.get("book_team", "Custom.EquipeBookDeTech"), ""),
+                "categoria": f.get(field_map.get("categoria", "Custom.Categoria"), ""),
+                "chamado": f.get(field_map.get("chamado", "Custom.Chamado"), None),
             }
         )
 

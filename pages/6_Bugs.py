@@ -27,6 +27,42 @@ bugs = df[df["item_type_general"] == "Defeito"].copy()
 bugs_open = bugs[bugs["closed_date"].isna()].copy()
 bugs_closed = bugs[bugs["closed_date"].notna()].copy()
 
+# ─── Bugs Pendentes Time Sustentação (primeiro donut) ─────────────────────────
+# Query: Bug | State IN (estados pendentes) | Categoria = Externo | Chamado > 0
+# | Area Path = EmiteAi\Prod Time Sustentação
+_PENDING_STATES = [
+    "ag. desenvolvimento", "para fazer", "validação", "validacao",
+    "impedimento", "em andamento", "code review", "aguardando release",
+    "aguardando code review", "release", "aguardando", "backlog",
+    "pronta para desenvolvimento", "refinamento", "discovery",
+]
+
+def _is_pending_state(state: str) -> bool:
+    sl = str(state).lower()
+    return any(s in sl for s in _PENDING_STATES)
+
+bugs_sustentacao = bugs[
+    bugs["area_path"].str.contains("Sustenta", na=False, case=False) |
+    bugs["team"].str.contains("Sustenta", na=False, case=False)
+].copy()
+
+bugs_sustentacao_pendentes = bugs_sustentacao[
+    bugs_sustentacao["state"].apply(_is_pending_state) &
+    bugs_sustentacao["closed_date"].isna()
+].copy()
+
+# Filtro Categoria = Externo (se campo disponível)
+if "categoria" in bugs_sustentacao_pendentes.columns:
+    cat_externo = bugs_sustentacao_pendentes["categoria"].str.lower().str.contains("externo|external", na=False)
+    if cat_externo.any():
+        bugs_sustentacao_pendentes = bugs_sustentacao_pendentes[cat_externo]
+
+# Filtro Chamado > 0 (se campo disponível)
+if "chamado" in bugs_sustentacao_pendentes.columns:
+    chamado_valido = pd.to_numeric(bugs_sustentacao_pendentes["chamado"], errors="coerce").fillna(0) > 0
+    if chamado_valido.any():
+        bugs_sustentacao_pendentes = bugs_sustentacao_pendentes[chamado_valido]
+
 # Dias em aberto para bugs sem entrega
 bugs_open["days_open"] = (today - bugs_open["created_date"]).dt.days.fillna(0).astype(int)
 
@@ -195,7 +231,10 @@ def kpi_colored(label, value, bg_color, text_color="#FFFFFF"):
 col_donut1, col_center, col_donut2 = st.columns([3, 2, 3])
 
 with col_donut1:
-    st.plotly_chart(donut_by_state(bugs_open, "Bugs Abertos por Status"), use_container_width=True)
+    st.plotly_chart(donut_by_state(
+        bugs_sustentacao_pendentes,
+        "Bugs Pendentes — Time Sustentação"
+    ), use_container_width=True)
 
 with col_center:
     st.markdown(kpi_colored("Bugs Abertos", total_open, "#1E90FF"), unsafe_allow_html=True)
