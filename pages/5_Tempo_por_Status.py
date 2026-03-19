@@ -19,45 +19,43 @@ if "items_df" not in st.session_state or st.session_state.items_df is None:
 df = st.session_state.filtered_df if "filtered_df" in st.session_state else st.session_state.items_df
 time_by_status = st.session_state.get("time_by_status_df", pd.DataFrame())
 
-col1, col2 = st.columns([1, 2])
-with col1:
-    st.markdown("""
-    <div style="background:#f5f5f5;border-radius:8px;padding:14px;font-size:13px;">
-    A métrica de tempo por status <b style="color:#4472C4;">quantifica o tempo, em horas úteis, que cada item permanece em um determinado status dentro de um processo.</b>
-    Este cálculo é feito somando-se as horas que os itens ficam em cada status, permitindo a identificação e análise de possíveis pontos de congestionamento no fluxo de trabalho.<br><br>
-    <b style="color:#FFA500;">OBS:</b> o cálculo de horas úteis leva em consideração o intervalo de 8h às 18h.
-    Sendo computado no máximo 8 horas por dia útil (excluindo feriado nacional e fim de semana).
-    </div>
-    """, unsafe_allow_html=True)
+import plotly.graph_objects as go
+import plotly.colors as pc
 
-with col2:
-    totals = time_in_status_totals(time_by_status)
-    if not totals.empty:
-        totals["hours_k"] = totals["hours"] / 1000
-        fig = horizontal_bar(totals, "status", "hours", list(config.STATUS_COLORS.values()),
-                              "Tempo por Status (horas) - Geral")
-        # Formata labels em K
-        import plotly.graph_objects as go
-        import plotly.colors as pc
-        _palette = pc.qualitative.Plotly + pc.qualitative.D3 + pc.qualitative.Set3
-        _status_list = list(totals["status"])
-        fig2 = go.Figure()
-        for i, (_, row) in enumerate(totals.iterrows()):
-            color = config.STATUS_COLORS.get(row["status"], _palette[i % len(_palette)])
-            label = f"{row['hours']/1000:.1f}K" if row["hours"] >= 1000 else f"{row['hours']:.0f}"
-            fig2.add_trace(go.Bar(
-                y=[row["status"]],
-                x=[row["hours"]],
-                orientation="h",
-                marker_color=color,
-                text=[label],
-                textposition="outside",
-                showlegend=False,
-            ))
-        fig2.update_layout(title="Tempo por Status (horas) - Geral",
-                            plot_bgcolor="white", paper_bgcolor="white",
-                            margin=dict(l=160, r=40, t=40, b=20))
-        st.plotly_chart(fig2, use_container_width=True)
+totals = time_in_status_totals(time_by_status)
+if not totals.empty:
+    _palette = pc.qualitative.Plotly + pc.qualitative.D3 + pc.qualitative.Set3
+    fig2 = go.Figure()
+    for i, (_, row) in enumerate(totals.iterrows()):
+        color = config.STATUS_COLORS.get(row["status"], _palette[i % len(_palette)])
+        label = f"{row['hours']/1000:.1f}K" if row["hours"] >= 1000 else f"{row['hours']:.0f}"
+        fig2.add_trace(go.Bar(
+            y=[row["status"]],
+            x=[row["hours"]],
+            orientation="h",
+            marker_color=color,
+            text=[label],
+            textposition="outside",
+            showlegend=False,
+        ))
+    fig2.update_layout(
+        title="Tempo por Status (horas) - Geral",
+        plot_bgcolor="white", paper_bgcolor="white",
+        margin=dict(l=200, r=80, t=40, b=20),
+        height=max(400, len(totals) * 28),
+    )
+    st.plotly_chart(fig2, use_container_width=True)
+
+st.markdown("""
+<div style="background:#f5f5f5;border-radius:8px;padding:14px;font-size:13px;">
+A métrica de tempo por status <b style="color:#4472C4;">quantifica o tempo, em horas úteis, que cada item permanece em um determinado status dentro de um processo.</b>
+Este cálculo é feito somando-se as horas que os itens ficam em cada status, permitindo a identificação e análise de possíveis pontos de congestionamento no fluxo de trabalho.<br><br>
+<b style="color:#FFA500;">OBS:</b> o cálculo de horas úteis leva em consideração o intervalo de 8h às 18h.
+Sendo computado no máximo 8 horas por dia útil (excluindo feriado nacional e fim de semana).
+</div>
+""", unsafe_allow_html=True)
+
+st.divider()
 
 # ─── Stacked bar % por mês ────────────────────────────────────────────────────
 st.subheader("Tempo por Status - Geral (% mensal)")
