@@ -198,7 +198,7 @@ def bar_daily_opened(df_bugs, days=10):
                       showlegend=False, yaxis=dict(title=""))
     return fig
 
-def bar_daily_closed(df_bugs, days=7):
+def bar_daily_closed(df_bugs, days=10):
     rows = []
     for i in range(days - 1, -1, -1):
         d = (today - pd.Timedelta(days=i)).date()
@@ -209,7 +209,7 @@ def bar_daily_closed(df_bugs, days=7):
     fig = go.Figure(go.Bar(x=day_df["date"], y=day_df["count"],
                             marker_color=colors, text=day_df["count"],
                             textposition="outside"))
-    fig.update_layout(title="Bugs Concluídos nos últimos 7 dias",
+    fig.update_layout(title="Bugs Concluídos nos últimos 10 dias",
                       plot_bgcolor="white", paper_bgcolor="white",
                       margin=dict(l=20, r=20, t=40, b=20),
                       showlegend=False, yaxis=dict(title=""))
@@ -229,7 +229,7 @@ def kpi_colored(label, value, bg_color, text_color="#FFFFFF"):
 # LAYOUT
 # ═══════════════════════════════════════════════════════════════════════════════
 
-# ─── Linha 1: dois donuts + KPIs centrais + barras ────────────────────────────
+# ─── Linha 1: donut sustentação + KPIs centrais + donut prioridade ────────────
 col_donut1, col_center, col_donut2 = st.columns([3, 2, 3])
 
 with col_donut1:
@@ -248,18 +248,16 @@ with col_center:
     st.markdown(kpi_colored("Bugs Alta / Sup", bugs_alta_sup, "#CC0000"), unsafe_allow_html=True)
 
 with col_donut2:
-    col_bar1, col_bar2 = st.columns(1), None
-    st.plotly_chart(bar_daily_opened(bugs), use_container_width=True)
-    st.plotly_chart(bar_daily_closed(bugs_closed), use_container_width=True)
+    st.plotly_chart(donut_by_priority(bugs_open, "Bugs Abertos por Prioridade"), use_container_width=True)
 
 st.divider()
 
-# ─── Linha 2: donut por prioridade ────────────────────────────────────────────
-col_left, col_right = st.columns([1, 1])
-with col_left:
-    st.plotly_chart(donut_by_priority(bugs_open, "Bugs Abertos por Prioridade"), use_container_width=True)
-with col_right:
-    st.plotly_chart(donut_by_state(bugs_closed, "Bugs Concluídos por Status"), use_container_width=True)
+# ─── Linha 2: barras diárias lado a lado ──────────────────────────────────────
+col_bar1, col_bar2 = st.columns(2)
+with col_bar1:
+    st.plotly_chart(bar_daily_opened(bugs), use_container_width=True)
+with col_bar2:
+    st.plotly_chart(bar_daily_closed(bugs_closed), use_container_width=True)
 
 st.divider()
 
