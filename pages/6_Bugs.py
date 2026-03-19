@@ -252,30 +252,31 @@ def kpi_colored(label, value, bg_color, text_color="#FFFFFF"):
 # LAYOUT
 # ═══════════════════════════════════════════════════════════════════════════════
 
-# ─── Linha 1: donut sustentação + KPIs centrais + donut prioridade ────────────
-col_donut1, col_center, col_donut2 = st.columns([3, 2, 3])
+# ─── Linha 1: donuts (esquerda, empilhados) + KPI cards (direita) ─────────────
+col_left, col_right = st.columns([3, 2])
 
-with col_donut1:
+with col_left:
     st.plotly_chart(donut_by_state(
         bugs_sustentacao_pendentes,
         "Bugs Pendentes — Time Sustentação"
     ), use_container_width=True)
+    st.plotly_chart(donut_by_priority(bugs_open, "Bugs Abertos por Severidade"), use_container_width=True)
 
-with col_center:
-    st.markdown(kpi_colored("Bugs Abertos", total_open, "#1E90FF"), unsafe_allow_html=True)
-    st.markdown("<div style='margin:6px 0'></div>", unsafe_allow_html=True)
-    st.markdown(kpi_colored("Dúvidas Abertos", duvidas, "#20B2AA"), unsafe_allow_html=True)
-    st.markdown("<div style='margin:6px 0'></div>", unsafe_allow_html=True)
-    st.markdown(kpi_colored("Bugs Média Prioridade", bugs_media, "#FFA500"), unsafe_allow_html=True)
-    st.markdown("<div style='margin:6px 0'></div>", unsafe_allow_html=True)
-    st.markdown(kpi_colored("Bugs Alta / Sup", bugs_alta_sup, "#CC0000"), unsafe_allow_html=True)
-
-with col_donut2:
-    with st.expander("🔍 Debug: valores de prioridade", expanded=True):
-        st.write("**Coluna `priority` (amostra):**", bugs_open["priority"].value_counts().head(10).to_dict())
-        extra_cols = [c for c in bugs_open.columns if "prior" in c.lower() or "priorid" in c.lower()]
-        st.write("**Colunas com 'prior' no nome:**", extra_cols)
-    st.plotly_chart(donut_by_priority(bugs_open, "Bugs Abertos por Prioridade"), use_container_width=True)
+with col_right:
+    card_html = "".join([
+        f"""<div style="background:{bg};border-radius:8px;padding:16px 12px;margin-bottom:10px;">
+            <div style="font-size:13px;font-weight:bold;color:#fff;">{label}</div>
+            <div style="font-size:38px;font-weight:bold;color:#fff;line-height:1.1;">{value}</div>
+            <div style="font-size:11px;color:#fff;opacity:0.85;">Work items</div>
+        </div>"""
+        for label, value, bg in [
+            ("Bugs Abertos",        total_open,     "#1E90FF"),
+            ("Dúvidas Abertos",     duvidas,        "#20B2AA"),
+            ("Bugs Média Severidade", bugs_media,   "#FFA500"),
+            ("Bugs Alta / Sup",     bugs_alta_sup,  "#CC0000"),
+        ]
+    ])
+    st.markdown(card_html, unsafe_allow_html=True)
 
 st.divider()
 
