@@ -153,14 +153,33 @@ def donut_by_state(df_bugs, title):
     return fig
 
 # ─── Bugs por prioridade (donut) ─────────────────────────────────────────────
+_PRI_LABEL_MAP = {
+    "1": "Crítica", "2": "Alta", "3": "Média", "4": "Baixa",
+    1: "Crítica", 2: "Alta", 3: "Média", 4: "Baixa",
+    "1 - critical": "Crítica", "2 - high": "Alta",
+    "3 - medium": "Média", "4 - low": "Baixa",
+    "critical": "Crítica", "high": "Alta",
+    "medium": "Média", "low": "Baixa",
+}
+_PRI_COLOR_MAP = {
+    "Crítica": "#CC0000", "Alta": "#FF6600",
+    "Média": "#FFA500", "Baixa": "#4472C4",
+    "Sem prioridade": "#AAAAAA",
+}
+
 def donut_by_priority(df_bugs, title):
-    counts = df_bugs["priority"].fillna("Sem prioridade").value_counts().reset_index()
+    labels = df_bugs["priority"].apply(
+        lambda x: _PRI_LABEL_MAP.get(str(x).lower().strip(),
+                  _PRI_LABEL_MAP.get(x, "Sem prioridade")) if pd.notna(x) and x != "" else "Sem prioridade"
+    )
+    counts = labels.value_counts().reset_index()
     counts.columns = ["priority", "count"]
-    pri_colors = {"1": "#FF0000", "2": "#FF6600", "3": "#FFA500",
-                  "4": "#4472C4", "1 - Critical": "#FF0000",
-                  "2 - High": "#FF6600", "3 - Medium": "#FFA500", "4 - Low": "#4472C4"}
-    colors = [pri_colors.get(str(p), palette[i % len(palette)])
-              for i, p in enumerate(counts["priority"])]
+    # Ordena por criticidade
+    order = ["Crítica", "Alta", "Média", "Baixa", "Sem prioridade"]
+    counts["_ord"] = counts["priority"].apply(lambda x: order.index(x) if x in order else 99)
+    counts = counts.sort_values("_ord").drop(columns="_ord")
+
+    colors = [_PRI_COLOR_MAP.get(p, "#AAAAAA") for p in counts["priority"]]
     fig = go.Figure(go.Pie(
         labels=counts["priority"],
         values=counts["count"],
