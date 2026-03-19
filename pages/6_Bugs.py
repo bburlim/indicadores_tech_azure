@@ -101,12 +101,12 @@ vencidos = len(bugs_open[bugs_open["days_open"] >= SLA_DAYS])
 
 # Prioridade
 def _is_high(row):
-    p = str(row.get("priority", "")).strip()
-    return p in ("1", "2", "1 - Critical", "2 - High", "Critical", "High")
+    s = str(row.get("severity", row.get("priority", ""))).lower().strip()
+    return any(k in s for k in ("1", "2", "alta", "alto", "críti", "criti", "high", "critical"))
 
 def _is_medium(row):
-    p = str(row.get("priority", "")).strip()
-    return p in ("3", "3 - Medium", "Medium")
+    s = str(row.get("severity", row.get("priority", ""))).lower().strip()
+    return any(k in s for k in ("3", "média", "medio", "médio", "medium"))
 
 bugs_alta_sup = len(bugs_open[bugs_open.apply(_is_high, axis=1)])
 bugs_media = len(bugs_open[bugs_open.apply(_is_medium, axis=1)])
@@ -153,35 +153,39 @@ def donut_by_state(df_bugs, title):
     return fig
 
 # ─── Bugs por prioridade (donut) ─────────────────────────────────────────────
-_PRI_LABEL_MAP = {
+_SEV_LABEL_MAP = {
     "1": "Crítica", "2": "Alta", "3": "Média", "4": "Baixa",
     1: "Crítica", 2: "Alta", 3: "Média", 4: "Baixa",
     "1 - critical": "Crítica", "2 - high": "Alta",
     "3 - medium": "Média", "4 - low": "Baixa",
+    "1 - crítico": "Crítica", "2 - alto": "Alta",
+    "3 - médio": "Média", "4 - baixo": "Baixa",
+    "crítica": "Crítica", "alta": "Alta",
+    "média": "Média", "baixa": "Baixa",
     "critical": "Crítica", "high": "Alta",
     "medium": "Média", "low": "Baixa",
 }
-_PRI_COLOR_MAP = {
+_SEV_COLOR_MAP = {
     "Crítica": "#CC0000", "Alta": "#FF6600",
     "Média": "#FFA500", "Baixa": "#4472C4",
-    "Sem prioridade": "#AAAAAA",
+    "Sem severidade": "#AAAAAA",
 }
 
 def donut_by_priority(df_bugs, title):
-    labels = df_bugs["priority"].apply(
-        lambda x: _PRI_LABEL_MAP.get(str(x).lower().strip(),
-                  _PRI_LABEL_MAP.get(x, "Sem prioridade")) if pd.notna(x) and x != "" else "Sem prioridade"
+    col = "severity" if "severity" in df_bugs.columns else "priority"
+    labels = df_bugs[col].apply(
+        lambda x: _SEV_LABEL_MAP.get(str(x).lower().strip(),
+                  str(x)) if pd.notna(x) and str(x) != "" else "Sem severidade"
     )
     counts = labels.value_counts().reset_index()
-    counts.columns = ["priority", "count"]
-    # Ordena por criticidade
-    order = ["Crítica", "Alta", "Média", "Baixa", "Sem prioridade"]
-    counts["_ord"] = counts["priority"].apply(lambda x: order.index(x) if x in order else 99)
+    counts.columns = ["severity", "count"]
+    order = ["Crítica", "Alta", "Média", "Baixa", "Sem severidade"]
+    counts["_ord"] = counts["severity"].apply(lambda x: order.index(x) if x in order else 99)
     counts = counts.sort_values("_ord").drop(columns="_ord")
 
-    colors = [_PRI_COLOR_MAP.get(p, "#AAAAAA") for p in counts["priority"]]
+    colors = [_SEV_COLOR_MAP.get(p, "#AAAAAA") for p in counts["severity"]]
     fig = go.Figure(go.Pie(
-        labels=counts["priority"],
+        labels=counts["severity"],
         values=counts["count"],
         hole=0.55,
         marker=dict(colors=colors),

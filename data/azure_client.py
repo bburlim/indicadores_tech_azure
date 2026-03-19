@@ -192,6 +192,7 @@ def _fetch_item_details(ids: list, field_map: dict) -> pd.DataFrame:
         "System.AreaPath",
         "System.Tags",
         "Microsoft.VSTS.Common.Priority",
+        "Microsoft.VSTS.Common.Severity",
     ]
     custom_fields = list(set(field_map.values()))
     fields = base_fields + custom_fields
@@ -233,6 +234,7 @@ def _fetch_item_details(ids: list, field_map: dict) -> pd.DataFrame:
                 "area_path": f.get("System.AreaPath", ""),
                 "tags": f.get("System.Tags", ""),
                 "priority": f.get("Microsoft.VSTS.Common.Priority", ""),
+                "severity": f.get("Microsoft.VSTS.Common.Severity", ""),
                 "team": team_val,
                 "segment": f.get(field_map.get("segment", "Custom.Segmento"), ""),
                 "product": f.get(field_map.get("product", "Custom.Produto"), ""),
