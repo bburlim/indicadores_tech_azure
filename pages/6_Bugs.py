@@ -253,7 +253,7 @@ def kpi_colored(label, value, bg_color, text_color="#FFFFFF"):
 # ═══════════════════════════════════════════════════════════════════════════════
 
 # ─── Linha 1: donuts (esquerda, empilhados) + KPI cards (direita) ─────────────
-col_left, col_right = st.columns([3, 2])
+col_left, col_right = st.columns([4, 1])
 
 with col_left:
     st.plotly_chart(donut_by_state(
@@ -264,16 +264,16 @@ with col_left:
 
 with col_right:
     card_html = "".join([
-        f"""<div style="background:{bg};border-radius:8px;padding:16px 12px;margin-bottom:10px;">
-            <div style="font-size:13px;font-weight:bold;color:#fff;">{label}</div>
-            <div style="font-size:38px;font-weight:bold;color:#fff;line-height:1.1;">{value}</div>
-            <div style="font-size:11px;color:#fff;opacity:0.85;">Work items</div>
+        f"""<div style="background:{bg};border-radius:8px;padding:8px 10px;margin-bottom:6px;">
+            <div style="font-size:11px;font-weight:bold;color:#fff;">{label}</div>
+            <div style="font-size:22px;font-weight:bold;color:#fff;line-height:1.1;">{value}</div>
+            <div style="font-size:10px;color:#fff;opacity:0.85;">Work items</div>
         </div>"""
         for label, value, bg in [
-            ("Bugs Abertos",        total_open,     "#1E90FF"),
-            ("Dúvidas Abertos",     duvidas,        "#20B2AA"),
-            ("Bugs Média Severidade", bugs_media,   "#FFA500"),
-            ("Bugs Alta / Sup",     bugs_alta_sup,  "#CC0000"),
+            ("Bugs Abertos",          total_open,    "#1E90FF"),
+            ("Dúvidas Abertos",       duvidas,       "#20B2AA"),
+            ("Bugs Média Severidade", bugs_media,    "#FFA500"),
+            ("Bugs Alta / Sup",       bugs_alta_sup, "#CC0000"),
         ]
     ])
     st.markdown(card_html, unsafe_allow_html=True)
