@@ -303,6 +303,14 @@ kpis = [
     ("Code Review",         bugs_code_review,  "#1C5C1C"),
 ]
 
-cols = st.columns(len(kpis))
-for col, (label, value, color) in zip(cols, kpis):
+row1, row2 = kpis[:5], kpis[5:]
+
+cols = st.columns(5)
+for col, (label, value, color) in zip(cols, row1):
+    col.markdown(kpi_colored(label, value, color), unsafe_allow_html=True)
+
+st.markdown("<div style='margin:8px 0'></div>", unsafe_allow_html=True)
+
+cols = st.columns(5)
+for col, (label, value, color) in zip(cols, row2):
     col.markdown(kpi_colored(label, value, color), unsafe_allow_html=True)
