@@ -181,24 +181,35 @@ def sla_bugs_by_month(df: pd.DataFrame, sla_days: int = 15) -> pd.DataFrame:
 
 # ─── Defeitos por Origem ─────────────────────────────────────────────────────
 
+def _classify_origin(row) -> str:
+    """
+    Determina a origem do defeito.
+    Prioridade: campo 'categoria' (Externo → Cliente) > campo 'tags'.
+    """
+    # 1) Campo categoria (Custom.Categoria)
+    cat = str(row.get("categoria", "") or "").lower().strip()
+    if cat:
+        if "externo" in cat or "external" in cat or "cliente" in cat or "client" in cat:
+            return "Cliente"
+        if "interno" in cat or "internal" in cat:
+            return "Interno"
+
+    # 2) Fallback: tags
+    tags = str(row.get("tags", "") or "").lower()
+    if "cliente" in tags or "client" in tags:
+        return "Cliente"
+    return "Interno"
+
+
 def defects_by_origin_month(df: pd.DataFrame) -> pd.DataFrame:
-    """Backlog de defeitos por origem (tags: Cliente / Interno)."""
+    """Backlog de defeitos por origem (Categoria ou Tags: Cliente / Interno)."""
     bugs = df[df["item_type_general"] == "Defeito"].copy()
     if bugs.empty:
         return pd.DataFrame()
 
-    def _get_origin(tags: str) -> str:
-        if not tags:
-            return "Interno"
-        tags_lower = str(tags).lower()
-        if "cliente" in tags_lower or "client" in tags_lower:
-            return "Cliente"
-        return "Interno"
-
-    bugs["origin"] = bugs["tags"].apply(_get_origin)
+    bugs["origin"] = bugs.apply(_classify_origin, axis=1)
     bugs["month"] = bugs["created_date"].dt.to_period("M")
 
-    # Backlog acumulado por mês
     months = sorted(bugs["month"].unique())
     rows = []
     for month in months:
@@ -225,17 +236,10 @@ def defects_delivered_by_origin_month(df: pd.DataFrame) -> pd.DataFrame:
     if bugs.empty:
         return pd.DataFrame()
 
-    def _get_origin(tags):
-        if not tags:
-            return "Interno"
-        return "Cliente" if "cliente" in str(tags).lower() else "Interno"
-
-    bugs["origin"] = bugs["tags"].apply(_get_origin)
+    bugs["origin"] = bugs.apply(_classify_origin, axis=1)
     bugs["month"] = bugs["closed_date"].dt.to_period("M")
 
-    result = (
-        bugs.groupby(["month", "origin"]).size().reset_index(name="count")
-    )
+    result = bugs.groupby(["month", "origin"]).size().reset_index(name="count")
     result["month"] = result["month"].dt.to_timestamp()
     return result
 
@@ -246,12 +250,7 @@ def defects_opened_by_origin_month(df: pd.DataFrame) -> pd.DataFrame:
     if bugs.empty:
         return pd.DataFrame()
 
-    def _get_origin(tags):
-        if not tags:
-            return "Interno"
-        return "Cliente" if "cliente" in str(tags).lower() else "Interno"
-
-    bugs["origin"] = bugs["tags"].apply(_get_origin)
+    bugs["origin"] = bugs.apply(_classify_origin, axis=1)
     bugs["month"] = bugs["created_date"].dt.to_period("M")
 
     result = bugs.groupby(["month", "origin"]).size().reset_index(name="count")
