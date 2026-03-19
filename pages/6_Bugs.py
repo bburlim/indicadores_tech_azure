@@ -267,6 +267,10 @@ with col_center:
     st.markdown(kpi_colored("Bugs Alta / Sup", bugs_alta_sup, "#CC0000"), unsafe_allow_html=True)
 
 with col_donut2:
+    with st.expander("🔍 Debug: valores de prioridade", expanded=True):
+        st.write("**Coluna `priority` (amostra):**", bugs_open["priority"].value_counts().head(10).to_dict())
+        extra_cols = [c for c in bugs_open.columns if "prior" in c.lower() or "priorid" in c.lower()]
+        st.write("**Colunas com 'prior' no nome:**", extra_cols)
     st.plotly_chart(donut_by_priority(bugs_open, "Bugs Abertos por Prioridade"), use_container_width=True)
 
 st.divider()
