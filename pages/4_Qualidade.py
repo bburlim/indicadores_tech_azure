@@ -207,6 +207,11 @@ st.divider()
 
 # ─── Defeitos por Origem ──────────────────────────────────────────────────────
 st.subheader("Defeitos por Origem (Cliente x Interno)")
+bugs_dbg = df_filtered[df_filtered["item_type_general"] == "Defeito"]
+with st.expander("🔍 Debug Origem", expanded=True):
+    col_dbg = "categoria" if "categoria" in bugs_dbg.columns else "tags"
+    st.write(f"Coluna usada: `{col_dbg}`")
+    st.write(bugs_dbg[col_dbg].fillna("(vazio)").value_counts().head(10).to_dict())
 
 backlog_origin = defects_by_origin_month(df_filtered)
 delivered_origin = defects_delivered_by_origin_month(df_filtered)
