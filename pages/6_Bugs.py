@@ -51,17 +51,19 @@ bugs_sustentacao_pendentes = bugs_sustentacao[
     bugs_sustentacao["closed_date"].isna()
 ].copy()
 
-# Filtro Categoria = Externo (se campo disponível)
+# Filtro Categoria = Externo (se campo disponível e preenchido)
 if "categoria" in bugs_sustentacao_pendentes.columns:
-    cat_externo = bugs_sustentacao_pendentes["categoria"].str.lower().str.contains("externo|external", na=False)
-    if cat_externo.any():
-        bugs_sustentacao_pendentes = bugs_sustentacao_pendentes[cat_externo]
+    filled = bugs_sustentacao_pendentes["categoria"].notna() & (bugs_sustentacao_pendentes["categoria"] != "")
+    if filled.any():
+        bugs_sustentacao_pendentes = bugs_sustentacao_pendentes[
+            bugs_sustentacao_pendentes["categoria"].str.lower().str.contains("externo|external", na=False)
+        ]
 
-# Filtro Chamado > 0 (se campo disponível)
+# Filtro Chamado > 0 (se campo disponível e preenchido)
 if "chamado" in bugs_sustentacao_pendentes.columns:
-    chamado_valido = pd.to_numeric(bugs_sustentacao_pendentes["chamado"], errors="coerce").fillna(0) > 0
-    if chamado_valido.any():
-        bugs_sustentacao_pendentes = bugs_sustentacao_pendentes[chamado_valido]
+    chamado_num = pd.to_numeric(bugs_sustentacao_pendentes["chamado"], errors="coerce")
+    if chamado_num.notna().any():
+        bugs_sustentacao_pendentes = bugs_sustentacao_pendentes[chamado_num.fillna(0) > 0]
 
 # Dias em aberto para bugs sem entrega
 bugs_open["days_open"] = (today - bugs_open["created_date"]).dt.days.fillna(0).astype(int)
