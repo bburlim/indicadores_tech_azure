@@ -28,25 +28,34 @@ if config.AZURE_ORG and config.AZURE_PROJECT and config.AZURE_PAT:
         from data.azure_client import get_discovered_fields, discover_custom_fields
         try:
             field_map = discover_custom_fields()
-            rows = []
             labels = {
-                "team": "Equipe",
-                "segment": "Segmento",
-                "product": "Produto",
-                "functional_team": "Time Funcional",
-                "journey": "Jornada",
-                "project": "Projeto",
-                "feature": "Funcionalidade",
-                "platform": "Plataforma",
-                "book_team": "Equipe Book de Tech",
+                "team": "Equipe", "segment": "Segmento", "product": "Produto",
+                "functional_team": "Time Funcional", "journey": "Jornada",
+                "project": "Projeto", "feature": "Funcionalidade",
+                "platform": "Plataforma", "book_team": "Equipe Book de Tech",
+                "categoria": "Categoria", "chamado": "Chamado",
             }
+            rows = []
             for key, ref in field_map.items():
-                rows.append({
-                    "Campo Interno": labels.get(key, key),
-                    "Referência Azure DevOps": ref,
-                    "Status": "✅ Descoberto automaticamente" if not ref.startswith("Custom.") or key else "⚠️ Usando padrão",
-                })
+                rows.append({"Campo Interno": labels.get(key, key), "Referência Azure DevOps": ref})
             st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+
+            # Busca campos que contêm "categor" no nome real da API
+            import base64, requests
+            token = base64.b64encode(f":{config.AZURE_PAT}".encode()).decode()
+            headers = {"Authorization": f"Basic {token}"}
+            url = f"https://dev.azure.com/{config.AZURE_ORG}/{config.AZURE_PROJECT}/_apis/wit/fields?api-version=7.1"
+            resp = requests.get(url, headers=headers, timeout=30)
+            if resp.status_code == 200:
+                all_fields = resp.json().get("value", [])
+                matched = [
+                    {"name": f["name"], "referenceName": f["referenceName"]}
+                    for f in all_fields
+                    if any(k in f.get("name","").lower() for k in ("categor", "chamado", "ticket", "origin"))
+                ]
+                if matched:
+                    st.markdown("**Campos com 'categoria/chamado/origin' no nome:**")
+                    st.dataframe(pd.DataFrame(matched), use_container_width=True, hide_index=True)
 
         except Exception as e:
             st.error(f"Erro ao consultar campos: {e}")
